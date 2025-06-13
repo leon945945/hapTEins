@@ -1,5 +1,7 @@
 # hapTEins
 A pipeline for transposable elements(TE) insertion detection at haplotype-level
+## Usage
+clone this repository, then run script in your working directory
 ## The pipeline comprise three steps to detect TE insertions at haplotype-level
 1. align NGS data to both haplotypes and perform reads phasing
 2. detect TE insertions utilizing TE insertion signals for each haplotype 
