@@ -1,8 +1,39 @@
 #!/bin/bash
-file=$1
+#!/bin/bash
+
+show_help() {
+    cat << EOF
+usage: ${0##*/} [-h] [-f FILE]
+
+parameters:
+  -h            help message
+  -f FILE       fastq path file; file format: fq1 fq2 samplename
+EOF
+}
+
+# 默认值
+file=""
+
+# 解析参数
+while getopts "hf:" opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        f)
+            file=$OPTARG
+            ;;
+        ?)
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
 cat ${file} | grep -v "#" | while read line
 do
-	fqs=(${line}); fq1=${fqs[0]}; fq2=${fqs[1]}; fq=$(basename ${fq1}); sample=${fq%%_*}
+	fqs=(${line}); fq1=${fqs[0]}; fq2=${fqs[1]}; sample=${fqs[2]}
 	echo $fq1, $fq2, $sample
 	#1.将fastq比对到M/P单倍型
 	echo "##################################################"
