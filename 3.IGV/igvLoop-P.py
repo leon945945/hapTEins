@@ -1,41 +1,45 @@
-#!/bin/env python3
+#!/home/songlizhi/software/miniconda3/bin/python
 import pandas as pd
-import openpyxl
+import glob
 import os
 import re
+import sys
 #modify point
-igvScript = "sv.P.igv.batch"
-sheets = openpyxl.load_workbook("/home02/songlizhi/sports/hifi/calling/sv/SWO.P.sv.noXG.filter.csq.xlsx").sheetnames
-sheets = sheets[0:len(sheets)-2]
-sheets = ["HQ_TL"]
-
-bamDir = "/home02/songlizhi/sports/hifi/align/"
-#files  = os.listdir("/home02/songlizhi/sports/hifi/calling/sv/igv/sv.P")
-for sheet in sheets:
-	sv  = pd.read_excel("/home02/songlizhi/sports/hifi/calling/sv/SWO.P.sv.noXG.filter.csq.xlsx", sheet_name = sheet)
-	for index in sv.index:
-		chr = sv.loc[index,"chr"]
-		start = int(sv.loc[index,"pos"]) - 200 if int(sv.loc[index,"pos"])>200 else 1
-		end = int(sv.loc[index,"pos"]) + abs(sv.loc[index,"svlen"]) + 200 if sv.loc[index,"svtype"]=="DEL" else int(sv.loc[index,"pos"]) + 200
-		name = sheet + "-" + chr + "-" + str(start) + "-" + str(end) + ".png"
-		#if not chr=="V-P9":
-			#continue
-
-		with open(igvScript, "w") as script:
-			print("new", file = script)
-			print("genome /home/songlizhi/genome/swoT2T/V_T2T-P.fa", file = script)
-			Bams = os.listdir(bamDir)
-			Bams.sort()
-			for bam in Bams:
-				#modify point
-				if re.findall(".*P.reads.bam$", bam):
-					print("load " + bamDir + bam, file = script)
-			#modify point
-			print("snapshotDirectory sv.P", file = script)
-			print("goto " + chr + ":" + str(start) + "-" + str(end), file = script)
-			print("setSleepInterval 800", file = script)
-			print("snapshot " + sheet + "-" + chr + "-" + str(start) + "-" + str(end) + ".png", file = script)
-			print("exit", file = script)
-
-		#modify point
-		os.system("/home/songlizhi/software/IGV_Linux_2.14.1/igv.sh --batch sv.P.igv.batch")
+igvScript = "TE.P.igv.batch"
+sample = sys.argv[1]
+bamDir = "/home/songlizhi/sports/swo/align/"
+bam    = sample + ".P_TE.bam.realigned.markdup.bam"
+disAln = pd.read_csv("/home/songlizhi/sports/swo/align/P_TE_detect/"+sample+".P.disAlign.txt",header=None,names=["id"])
+TEAlns = glob.glob("/home/songlizhi/sports/swo/align/P_TE_detect/"+sample+".P-TE*.TEalign.txt")
+dfs = []
+if not os.path.exists("{sample}.P".format(sample=sample)):
+        os.system("mkdir {sample}.P".format(sample=sample))
+for TEAln in TEAlns:
+        tp = re.findall("TE[0-9]+",TEAln)[0]
+        df = pd.read_csv(TEAln,header=None,names=["id"])
+        df["id"] = tp+"-"+df["id"]
+        dfs.append(df)
+dfs.append(disAln)
+Adf = pd.concat(dfs,axis=0).sort_values("id").drop_duplicates().reset_index(drop=True)
+def splt(x):
+        return pd.Series([x.split("-")[0], "-".join(x.split("-")[1:3]), x.split("-")[-1]],index=["type","chrom","pos"])
+Odf = Adf["id"].apply(splt).sort_values(["type","chrom","pos"],axis="index")
+Odf.to_csv("/home/songlizhi/sports/swo/align/P_TE_detect/{sample}.P.TEins.csv".format(sample=sample))
+for index in Adf.index:
+        item = Adf.loc[index,"id"]
+        chr = "-".join(item.split("-")[1:3])
+        pos = item.split("-")[-1]
+        start = int(pos) - 300 if int(pos)>300 else 1
+        end = int(pos) + 300
+        name = item + ".png"
+        with open(igvScript, "w") as script:
+                print("new", file = script)
+                print("genome /home/songlizhi/genome/swoT2T/T2T_TE/swoP_TE.fa", file = script)
+                print("load " + bamDir + bam, file = script)
+                print("snapshotDirectory {sample}.P".format(sample=sample), file = script)
+                print("goto " + chr + ":" + str(start) + "-" + str(end), file = script)
+                print("setSleepInterval 800", file = script)
+                print("snapshot " + item + ".png", file = script)
+                print("exit", file = script)
+        #modify point
+        os.system("/home/songlizhi/software/IGV_Linux_2.14.1/igv.sh --batch TE.P.igv.batch")

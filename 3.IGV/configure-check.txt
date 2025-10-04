@@ -1,0 +1,12 @@
+sample
+	igvLoop.py, igvLoop-P.py:
+		line 9: sample name
+genome
+	igvLoop.py, igvLoop-P.py:
+		line 37: genome file appended with TEs
+directionary:
+	igvLoop.py, igvLoop-P.py:
+		line 10, 12, 13, 27
+software
+	igvLoop.py, igvLoop-P.py:
+		line 45: the path to IGV software
