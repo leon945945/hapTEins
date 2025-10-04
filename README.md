@@ -23,6 +23,7 @@ This procedure comprises three steps:
 6. align the phased reads to haplotypes appended with your target TEs, `align-M_TE.sh` and `align-P_TE.sh`
    
    - **same to step1, but substitute the ${ref} and ${genome} as your reference genome appended with target TEs, with each TE as individual sequences**
+   - for example, >TE1\nATGC, >TE2\nATGC, >chr1\nATGC etc
 
 ## 2. detect TE insertion for each haplotype, `pipeline-dectTE.sh`
 
