@@ -10,6 +10,9 @@ Dep = sys.argv[3]
 fq1 = sys.argv[4]
 fq2 = sys.argv[5]
 sample = sys.argv[6]
+
+TEfa=path/to/your/TEs.fa#目标TE序列的fasta文件
+
 #1.读入sam文件，和每个位点的深度
 print("2.1 read in sam file and get the depth of each position")
 sam = pd.read_csv(SAM,sep="\t",names=["qName","FLAG","RNAME","POS","MAPQ","CIGAR","MRNM","MPOS","ISIZE"])
@@ -49,9 +52,9 @@ softC = []
 for chrom,pos in zip(posChr,avePos):
 	TEregion = chrom+":"+str(pos-500)+"-"+str(pos+500) if pos > 500 else chrom+":"+"1"+"-"+str(pos+500)
 	#print(bam,TEregion)
-	os.system("/home/songlizhi/learning/TEdev/findSplit {bam} {TEregion} > {sample}.softClip".format(bam=bam,TEregion=TEregion,sample=sample))
+	os.system("./findSplit {bam} {TEregion} > {sample}.softClip".format(bam=bam,TEregion=TEregion,sample=sample))
 	softC.append(pd.read_csv("{sample}.softClip".format(sample=sample),sep="\t",names=["reads","clipPos"]))
-#6.对reads的soft clip位置统计数量，数量最多的前两个的距离小于20bp，认为是TE插入的候选区间
+#6.对reads的soft clip位置统计数量，数量最多的前两个的距离小于20bp，reads数目大于10，认为是TE插入的候选区间
 print("2.6 stats the num of soft clip, the distance of top2 soft clip position less than 20bp was considered as candidate region")
 softcN = []
 for i in softC:
@@ -84,7 +87,7 @@ for idx,reg in enumerate(candTEIns):
 	chrom = "-".join(reg.split("-")[0:2])
 	pos   = int(reg.split("-")[-1])
 	region = chrom+":"+str(pos-50)+"-"+str(pos+50) if pos > 50 else chrom+":"+"1"+"-"+str(pos+50)
-	os.system("/home/songlizhi/learning/TEdev/getReadsMateTag {bam} {region} > {sample}.readsTag".format(bam=bam,region=region,sample=sample))
+	os.system("./getReadsMateTag {bam} {region} > {sample}.readsTag".format(bam=bam,region=region,sample=sample))
 	try:
 		RT = pd.read_csv("{sample}.readsTag".format(sample=sample),sep="\t",header=0)
 	except:
@@ -108,7 +111,7 @@ for reg,dat in allRT_df.groupby("ID"):
 	print(*list(dat["readName"]),sep="\n",file=open("{sample}.reads".format(sample=sample),"w"))
 	os.system("seqkit grep -f {sample}.reads {sample}.fq1 > tmp.{sample}.fq1".format(sample=sample))
 	os.system("seqkit grep -f {sample}.reads {sample}.fq2 > tmp.{sample}.fq2".format(sample=sample))
-	os.system("bwa mem /home/songlizhi/genome/swoT2T/T2T_TE/TEs.fa tmp.{sample}.fq1 tmp.{sample}.fq2 | grep -v @ | cut -f 1-9 > {sample}.sam".format(sample=sample))
+	os.system("bwa mem {TEfa} tmp.{sample}.fq1 tmp.{sample}.fq2 | grep -v @ | cut -f 1-9 > {sample}.sam".format(TEfa=TEfa,sample=sample))
 	df = pd.read_csv("{sample}.sam".format(sample=sample),sep="\t",names=["qName","FLAG","RNAME","POS","MAPQ","CIGAR","MRNM","MPOS","ISIZE"])
 	print(df)
 	if sum(df["RNAME"].str.match("TE"))==0:

@@ -29,9 +29,11 @@ int main(int argc, char * argv[])
 			continue;
 		}
 		else if (clen > 1) {
+			//如果CIGAR第一位是softclip
 			if (bam_cigar_opchr(carray[0]) == 'S') {
 				printf("%s\t%ld\n", bam_get_qname(aln), aln->core.pos);
 			}
+			//如果CIGAR最后以为是softclip
 			if (bam_cigar_opchr(carray[clen - 1]) == 'S') {
 				printf("%s\t%ld\n", bam_get_qname(aln), aln->core.pos + bam_cigar2rlen(clen, carray));
 			}
