@@ -7,13 +7,13 @@ import sys
 bam = sys.argv[1]
 readsTag = sys.argv[2]
 sample = sys.argv[3]
-TEs = ["TE3002","TE4474","TE5564","TE5813","TE6353","TE6936","TE12547"]#替换为添加在基因组文件中的TE名称
+TEs = ["TE3002","TE4474","TE5564","TE5813","TE6353","TE6936","TE12547"]
 for TE in TEs:
-	mL = int(TE.replace("TE",""))#TE长度
+	mL = int(TE.replace("TE",""))
 	#1.提取比对到TE的reads
 	os.system("grep {TE} {RT} | sort -k 12n > {sample}.txt".format(TE=TE,RT=readsTag,sample=sample))
 	dat = pd.read_csv("{sample}.txt".format(sample=sample),sep="\t",names=["readName","chr","begin","AS","NM","alignLength","cigarNum","readLength","ratio","type","Mchr","Mbegin"])
-	#2.提取discordant reads，一条read比对到TE，另一条read比对到基因组
+	#2.提取discordant reads
 	dat = dat.loc[~dat["Mchr"].str.match("TE"),:].reset_index(drop=True)
 	if dat.empty:
 		continue
@@ -22,8 +22,6 @@ for TE in TEs:
 	binL = []
 	begP = dat.loc[0,"Mbegin"]
 	for idx in dat.index:
-		#无需对染色体进行排序，同一个TE插入的reads会根据插入位置聚在一起
-		#当discordant reads之间的距离大于TE序列长度时，认为是下一个插入
 		if dat.loc[idx,"Mbegin"] - begP > mL:
 			binL.append(dat.iloc[beg:idx,])
 			beg = idx
@@ -41,10 +39,10 @@ for TE in TEs:
 	softC = []
 	for chrom,pos in zip(posChr,avePos):
 		TEregion = chrom+":"+str(pos-500)+"-"+str(pos+500) if pos> 500 else chrom+":"+"1"+"-"+str(pos+500)
-		os.system("./findSplit {bam} {TEregion} > {sample}.softClip".format(bam=bam,TEregion=TEregion,sample=sample))
+		os.system("/home/songlizhi/learning/TEdev/findSplit {bam} {TEregion} > {sample}.softClip".format(bam=bam,TEregion=TEregion,sample=sample))
 		softC.append(pd.read_csv("{sample}.softClip".format(sample=sample),sep="\t",names=["reads","clipPos"]))
 	#6.对reads的soft clip位置统计数量，数量最多的前两个的距离小于20bp，认为是TE插入的候选区间
-	softcN = []
+	softcN = []; softClipN = []; regionIs = []; regionLs = []; regionRs = []
 	for i in softC:
 		counter = Counter(i["clipPos"])
 		softcN.append(counter)
@@ -54,16 +52,30 @@ for TE in TEs:
 		if len(top2)<2:
 			continue
 		if abs(top2[0][0]-top2[1][0]) < 20:
+			softClipN.append(top2[0][1]+top2[1][1])
+			Len = abs(top2[0][0]-top2[1][0])
+			S   = top2[0][0] if top2[0][0] < top2[1][0] else top2[1][0]
 			ins = chrom+"-"+str(top2[0][0])
-			candTEins.append(ins)
-	#7.对候选插入位置的深度进行过滤，如果超过100或小于10则过滤掉
-	candTEIns = []
+			#使用softlip reads数量评分
+			regionI = chrom+":"+str(S+1)+"-"+str(S+1+Len)
+			regionL = chrom+":"+str(S-Len)+"-"+str(S)
+			regionR = chrom+":"+str(S+1+Len)+"-"+str(S+1+Len+Len)
+			depI   = int(subprocess.getoutput("echo $(samtools depth -a -g 256 -r {region} {bam} | cut -f 3 | tr '\n' '+' | sed 's/+$//') | bc".format(region=regionI,bam=bam)))/Len
+			depL   = int(subprocess.getoutput("echo $(samtools depth -a -g 256 -r {region} {bam} | cut -f 3 | tr '\n' '+' | sed 's/+$//') | bc".format(region=regionL,bam=bam)))/Len
+			depR   = int(subprocess.getoutput("echo $(samtools depth -a -g 256 -r {region} {bam} | cut -f 3 | tr '\n' '+' | sed 's/+$//') | bc".format(region=regionR,bam=bam)))/Len
+			#根据softclip的深度比例调整得分
+			candTEins.append(ins); regionIs.append(depI); regionLs.append(depL); regionRs.append(depR)
+	#7.对候选插入位置的深度进行过滤，如果超过100则过滤掉
+	candTEIns = []; softClipN1 = []; regionIs1 = []; regionLs1 = []; regionRs1 = []
 	for idx,reg in enumerate(candTEins):
 		chrom = "-".join(reg.split("-")[0:2])
 		pos   = reg.split("-")[-1]
 		region = chrom+":"+pos+"-"+pos
 		dep   = subprocess.getoutput("samtools depth -a -g 256 -r {region} {bam}".format(region=region,bam=bam)).split("\t")[-1]
 		print(region,dep)
-		if int(dep)<100 or int(dep)>10:
-			candTEIns.append(candTEins[idx])
-	print(*candTEIns,sep="\n",file=open(sample+"-"+TE+".TEalign.txt","w"))
+		if int(dep)<100 and int(dep)>10:
+			candTEIns.append(candTEins[idx]); softClipN1.append(softClipN[idx]); regionIs1.append(regionIs[idx]); regionLs1.append(regionLs[idx]); regionRs1.append(regionRs[idx])
+
+	df = pd.DataFrame({"pos":candTEIns,"softclipN":softClipN1,"regionIdep":regionIs1,"regionLdep":regionLs1,"regionRdep":regionRs1})
+	df.to_csv(sample+"-"+TE+".TEalign.csv")
+	#print(*candTEIns,sep="\n",file=open(sample+"-"+TE+".TEalign.txt","w"))
